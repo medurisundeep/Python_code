@@ -13,7 +13,8 @@ def main():
     df, schema = exec_select(cursor, query)
     # print(df.shape)
     # print(schema)
-    write_csv_file(df, 'output.csv')
+    write_csv_file(df, 'files\output.csv')
+
 
 # connect to sql server database
 def conn_sql(server, db_name):
