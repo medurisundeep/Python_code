@@ -1,7 +1,8 @@
 import pandas as pd
 import pyodbc
 
-
+# This program will connect to sql server and executes select queries.
+# Saves the extracted data into csv file
 def main():
 
     server = 'DESKTOP-EHI4MET\DEV2019'
