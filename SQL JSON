@@ -1,0 +1,66 @@
+-- Use the appropriate database
+USE sample;
+GO
+
+-- Step 2: Convert customer records from SampleCustomerTable to JSON with embedded sales, sales details, and product details, and insert into CustomerJsonTable
+DECLARE @CustomerID INT;
+DECLARE @CustomerData NVARCHAR(MAX);
+DECLARE @SalesData NVARCHAR(MAX);
+
+-- Cursor to loop through each customer in SampleCustomerTable
+DECLARE CustomerCursor CURSOR FOR
+SELECT CustomerID FROM SampleCustomerTable;
+
+OPEN CustomerCursor;
+
+FETCH NEXT FROM CustomerCursor INTO @CustomerID;
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    -- Convert each customer record into JSON format
+    SELECT @CustomerData = (SELECT CustomerID, PersonID, StoreID, TerritoryID, AccountNumber, ModifiedDate
+                            FROM SampleCustomerTable
+                            WHERE CustomerID = @CustomerID 
+                            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
+    
+    -- Retrieve all sales for the current customer and convert them to JSON format
+    SELECT @SalesData = (
+        SELECT SalesID, ProductID, SalesDate, Quantity, TotalAmount,
+               (
+                   SELECT SalesDetailID, LineNumber, ProductID, Quantity, UnitPrice, LineTotal,
+                          (
+                              SELECT ProductID, ProductName, Price
+                              FROM SampleProductTable
+                              WHERE ProductID = sd.ProductID
+                              FOR JSON PATH --, WITHOUT_ARRAY_WRAPPER
+                          ) AS ProductDetails
+                   FROM SampleSalesDetailTable sd
+                   WHERE SalesID = s.SalesID
+                   FOR JSON PATH
+               ) AS SalesDetails
+        FROM SampleSalesTable s
+        WHERE s.CustomerID = @CustomerID
+        FOR JSON PATH
+    );
+
+    -- Combine Customer JSON with embedded Sales JSON
+    SET @CustomerData = JSON_MODIFY(@CustomerData, '$.Sales', JSON_QUERY(@SalesData));
+    
+    -- Insert the combined JSON data into CustomerJsonTable
+    INSERT INTO CustomerJsonTable (CustomerID, CustomerData)
+    VALUES (@CustomerID, @CustomerData);
+
+    -- Fetch the next customer record
+    FETCH NEXT FROM CustomerCursor INTO @CustomerID;
+END;
+
+-- Close and deallocate the cursor
+CLOSE CustomerCursor;
+DEALLOCATE CustomerCursor;
+GO
+
+-- Step 3: Verify the data is inserted
+-- Use JSON_QUERY to inspect and confirm JSON data
+SELECT CustomerID, 
+       CustomerData
+FROM CustomerJsonTable;
