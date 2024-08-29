@@ -1,0 +1,228 @@
+-- Use the appropriate database
+USE sample;
+GO
+
+-- ======================
+-- 1. Create Customer Table and Load Data
+-- ======================
+drop table if exists dbo.SampleSalesDetailTable;
+drop table if exists dbo.SampleSalesTable
+drop table if exists SampleProductTable
+drop table if exists [dbo].[SampleCustomerTable]
+
+-- Drop the table if it already exists
+IF OBJECT_ID('dbo.SampleCustomerTable', 'U') IS NOT NULL
+    DROP TABLE dbo.SampleCustomerTable;
+
+-- Create a new table to store customer data
+CREATE TABLE SampleCustomerTable (
+    CustomerID INT PRIMARY KEY,
+    PersonID INT,
+    StoreID INT,
+    TerritoryID INT,
+    AccountNumber NVARCHAR(10),
+    ModifiedDate DATETIME
+);
+
+-- Declare variables for the loop
+DECLARE @Counter INT = 1;
+DECLARE @PersonID INT;
+DECLARE @StoreID INT;
+DECLARE @TerritoryID INT;
+DECLARE @AccountNumber NVARCHAR(10);
+DECLARE @ModifiedDate DATETIME;
+
+-- Insert 100 sample records using a WHILE loop
+WHILE @Counter <= 100
+BEGIN
+    -- Generate sample data
+    SET @PersonID = CASE WHEN @Counter % 2 = 0 THEN @Counter + 100 ELSE NULL END;  -- Alternate between NULL and a value
+    SET @StoreID = CASE WHEN @Counter % 3 = 0 THEN @Counter + 200 ELSE NULL END;   -- Alternate between NULL and a value
+    SET @TerritoryID = (@Counter % 5) + 1;  -- Value between 1 and 5
+    SET @AccountNumber = 'AW' + RIGHT('000000' + CAST(@Counter AS NVARCHAR(6)), 6);  -- Create Account Number like 'AW000001'
+    SET @ModifiedDate = DATEADD(DAY, @Counter, '2023-01-01');  -- Increment dates
+
+    -- Insert data into the table
+    INSERT INTO SampleCustomerTable (CustomerID, PersonID, StoreID, TerritoryID, AccountNumber, ModifiedDate)
+    VALUES (@Counter, @PersonID, @StoreID, @TerritoryID, @AccountNumber, @ModifiedDate);
+
+    -- Increment the counter
+    SET @Counter = @Counter + 1;
+END;
+
+-- ======================
+-- 2. Create Sales Table and Load Data
+-- ======================
+
+-- Drop the Sales table if it already exists
+IF OBJECT_ID('dbo.SampleSalesTable', 'U') IS NOT NULL
+    DROP TABLE dbo.SampleSalesTable;
+
+-- Ensure the Customer table exists
+IF OBJECT_ID('dbo.SampleCustomerTable', 'U') IS NULL
+BEGIN
+    PRINT 'SampleCustomerTable does not exist. Please create the customer table first.';
+    RETURN;
+END
+
+-- Create the Sales table with a foreign key relationship to the Customer table
+CREATE TABLE SampleSalesTable (
+    SalesID INT PRIMARY KEY,  -- Primary Key for Sales table
+    CustomerID INT,           -- Foreign Key column to link to Customer table
+    ProductID INT,            -- Example Product ID column
+    SalesDate DATETIME,       -- Date of the sale
+    Quantity INT,             -- Quantity of the product sold
+    TotalAmount DECIMAL(10, 2), -- Total amount of the sale
+    CONSTRAINT FK_Sales_Customer FOREIGN KEY (CustomerID) REFERENCES SampleCustomerTable(CustomerID)  -- Foreign Key constraint
+);
+
+-- Declare variables for the loop
+DECLARE @SalesCounter INT = 1;  -- Counter for SalesID
+DECLARE @CustomerCounter INT = 1;  -- Counter for CustomerID
+DECLARE @ProductID INT;
+DECLARE @SalesDate DATETIME;
+DECLARE @Quantity INT;
+DECLARE @Price DECIMAL(10, 2);
+
+-- Load sales data for each customer
+WHILE @CustomerCounter <= 100
+BEGIN
+    -- Generate multiple sales for each customer
+    DECLARE @SalesPerCustomer INT = 10;  -- Number of sales records per customer
+    DECLARE @SalesLoop INT = 1;  -- Counter for sales records per customer
+
+    WHILE @SalesLoop <= @SalesPerCustomer
+    BEGIN
+        -- Generate sample data for sales
+        SET @ProductID = 1000 + (@SalesLoop * @CustomerCounter);  -- Generate ProductID
+        SET @SalesDate = DATEADD(DAY, @SalesCounter, '2023-01-01');  -- Generate Sales Date
+        SET @Quantity = (@SalesLoop % 5) + 1;  -- Quantity between 1 and 5
+        SET @Price = 19.99 + (@SalesLoop * 10);  -- Price increments by 10 for each loop
+
+        -- Insert data into the Sales table
+        INSERT INTO SampleSalesTable (SalesID, CustomerID, ProductID, SalesDate, Quantity, TotalAmount)
+        VALUES (@SalesCounter, @CustomerCounter, @ProductID, @SalesDate, @Quantity, @Quantity * @Price);
+
+        -- Increment counters
+        SET @SalesCounter = @SalesCounter + 1;
+        SET @SalesLoop = @SalesLoop + 1;
+    END;
+
+    -- Increment the customer counter
+    SET @CustomerCounter = @CustomerCounter + 1;
+END;
+
+-- ======================
+-- 3. Create Product Table and Load Data
+-- ======================
+
+-- Drop the Product table if it already exists
+IF OBJECT_ID('dbo.SampleProductTable', 'U') IS NOT NULL
+    DROP TABLE dbo.SampleProductTable;
+
+-- Create the Product table
+CREATE TABLE SampleProductTable (
+    ProductID INT PRIMARY KEY,      -- Primary Key for Product table
+    ProductName NVARCHAR(100),      -- Name of the product
+    ProductDescription NVARCHAR(255), -- Description of the product
+    Price DECIMAL(10, 2)            -- Price of the product
+);
+
+-- Insert sample products into the Product table
+INSERT INTO SampleProductTable (ProductID, ProductName, ProductDescription, Price)
+VALUES
+(1001, 'Product A', 'Description of Product A', 19.99),
+(1002, 'Product B', 'Description of Product B', 29.99),
+(1003, 'Product C', 'Description of Product C', 39.99),
+(1004, 'Product D', 'Description of Product D', 49.99),
+(1005, 'Product E', 'Description of Product E', 59.99);
+
+-- ======================
+-- 4. Create Sales Detail Table and Load Data
+-- ======================
+
+IF OBJECT_ID('dbo.SampleSalesDetailTable', 'U') IS NOT NULL
+    DROP TABLE dbo.SampleSalesDetailTable;
+
+-- Ensure the Sales table exists
+IF OBJECT_ID('dbo.SampleSalesTable', 'U') IS NULL
+BEGIN
+    PRINT 'SampleSalesTable does not exist. Please create the sales table first.';
+    RETURN;
+END
+
+-- Create the SalesDetail table with foreign key relationships to the Sales table and Product table
+CREATE TABLE SampleSalesDetailTable (
+    SalesDetailID INT PRIMARY KEY,  -- Primary Key for Sales Detail table
+    SalesID INT,                   -- Foreign Key column to link to Sales table
+    LineNumber INT,                -- Line number for the item in the sale
+    ProductID INT,                 -- Foreign Key column to link to Product table
+    Quantity INT,                  -- Quantity of the product sold
+    UnitPrice DECIMAL(10, 2),      -- Unit price of the product
+    LineTotal DECIMAL(10, 2),      -- Total price for the line item (Quantity * UnitPrice),
+    CONSTRAINT FK_SalesDetail_Sales FOREIGN KEY (SalesID) REFERENCES SampleSalesTable(SalesID),  -- Foreign Key constraint to Sales table
+    CONSTRAINT FK_SalesDetail_Product FOREIGN KEY (ProductID) REFERENCES SampleProductTable(ProductID)  -- Foreign Key constraint to Product table
+);
+
+-- Declare variables for the loop
+DECLARE @SalesDetailCounter INT = 1;  -- Counter for SalesDetailID
+DECLARE @SalesID INT;  -- Variable to hold SalesID
+DECLARE @LineNumber INT;  -- Line number for items in each sale
+DECLARE @UnitPrice DECIMAL(10, 2);
+
+-- Cursor to loop through each sale
+DECLARE SalesCursor CURSOR FOR 
+SELECT SalesID FROM SampleSalesTable;
+
+-- Open the cursor
+OPEN SalesCursor;
+
+-- Fetch the first row from the cursor
+FETCH NEXT FROM SalesCursor INTO @SalesID;
+
+-- Loop through each sale
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    -- Generate multiple line items for each sale
+    DECLARE @ItemsPerSale INT = 10;  -- Number of line items per sale
+    SET @LineNumber = 1;  -- Reset line number for each sale
+
+    WHILE @LineNumber <= @ItemsPerSale
+    BEGIN
+        -- Select a random ProductID from SampleProductTable
+        SELECT TOP 1 @ProductID = ProductID FROM SampleProductTable ORDER BY NEWID();  -- Select a random ProductID
+        SET @Quantity = (@LineNumber % 5) + 1;  -- Quantity between 1 and 5
+        SELECT @UnitPrice = Price FROM SampleProductTable WHERE ProductID = @ProductID;  -- Get the UnitPrice for the selected ProductID
+
+        -- Insert data into the SalesDetail table
+        INSERT INTO SampleSalesDetailTable (SalesDetailID, SalesID, LineNumber, ProductID, Quantity, UnitPrice, LineTotal)
+        VALUES (@SalesDetailCounter, @SalesID, @LineNumber, @ProductID, @Quantity, @UnitPrice, @Quantity * @UnitPrice);
+
+        -- Increment counters
+        SET @SalesDetailCounter = @SalesDetailCounter + 1;
+        SET @LineNumber = @LineNumber + 1;
+    END;
+
+    -- Fetch the next row from the cursor
+    FETCH NEXT FROM SalesCursor INTO @SalesID;
+END;
+
+-- Close and deallocate the cursor
+CLOSE SalesCursor;
+DEALLOCATE SalesCursor;
+
+-- Verify the data is inserted
+--SELECT * FROM SampleSalesDetailTable ORDER BY SalesID, LineNumber;
+
+
+-- Step 1: Ensure CustomerJsonTable exists (Drop if exists and create again)
+IF OBJECT_ID('dbo.CustomerJsonTable', 'U') IS NOT NULL
+    DROP TABLE dbo.CustomerJsonTable;
+GO
+
+CREATE TABLE CustomerJsonTable (
+    CustomerID INT PRIMARY KEY,   -- Column for Customer ID
+    CustomerData NVARCHAR(MAX)    -- Column to store JSON data as NVARCHAR(MAX)
+);
+GO
+
